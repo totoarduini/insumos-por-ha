@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Insumos por Ha — SOS Agro 26-27</title>
+<style>
+  :root {
+    --verde:       #2d6a2d;
+    --verde-claro: #4a9a4a;
+    --verde-bg:    #f0f7f0;
+    --verde-borde: #c8e0c8;
+    --acento:      #1a5c2a;
+    --gris:        #666;
+    --gris-borde:  #ddd;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f4f7f4; color: #222; font-size: 13px; }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--verde);
+    color: white;
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2);
+  }
+  .header-logo { font-size: 22px; }
+  .header-title { font-size: 15px; font-weight: 700; flex: 1; }
+  .header-sub { font-size: 11px; opacity: .7; }
+  #sync-status { font-size: 11px; color: #a5d6a7; }
+  #sync-btn {
+    background: rgba(255,255,255,.15);
+    border: 1px solid rgba(255,255,255,.3);
+    color: white;
+    padding: 5px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: background .15s;
+  }
+  #sync-btn:hover { background: rgba(255,255,255,.25); }
+  #sync-btn:disabled { opacity: .5; cursor: default; }
+
+  /* ── FILTROS ── */
+  .filters-bar {
+    background: white;
+    border-bottom: 2px solid var(--verde-borde);
+    padding: 12px 18px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: flex-end;
+    position: sticky;
+    top: 48px;
+    z-index: 99;
+    box-shadow: 0 2px 6px rgba(0,0,0,.06);
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; min-width: 160px; }
+  .filter-group label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--gris); }
+  .filter-group select {
+    border: 1px solid var(--gris-borde);
+    border-radius: 5px;
+    padding: 6px 10px;
+    font-size: 12px;
+    background: white;
+    cursor: pointer;
+    outline: none;
+    transition: border-color .15s;
+    min-width: 160px;
+  }
+  .filter-group select:focus { border-color: var(--verde-claro); box-shadow: 0 0 0 2px rgba(74,154,74,.15); }
+
+  .tipo-chips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .tipo-chip {
+    padding: 3px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--gris-borde);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    background: white;
+    transition: all .15s;
+    user-select: none;
+  }
+  .tipo-chip.active { background: var(--verde); color: white; border-color: var(--verde); }
+  .tipo-chip:hover { border-color: var(--verde-claro); }
+
+  /* ── CONTENIDO ── */
+  .main { padding: 16px 18px; }
+
+  .info-bar {
+    font-size: 11px;
+    color: var(--gris);
+    margin-bottom: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .info-tag {
+    background: var(--verde-bg);
+    border: 1px solid var(--verde-borde);
+    border-radius: 10px;
+    padding: 2px 9px;
+    font-weight: 600;
+    color: var(--acento);
+  }
+
+  /* ── TABLA ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  thead tr { background: var(--verde); color: white; }
+  th { padding: 9px 12px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; white-space: nowrap; }
+  th.num { text-align: right; }
+  td { padding: 7px 12px; border-bottom: 1px solid #f0f0f0; font-size: 12px; vertical-align: middle; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--acento); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--verde-bg); }
+
+  /* grupo de categoría */
+  .cat-sep td {
+    background: var(--verde-bg);
+    border-top: 2px solid var(--verde-borde);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--acento);
+    padding: 5px 12px;
+  }
+
+  /* tipo badge */
+  .tipo-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  /* ── EMPTY ── */
+  .empty { text-align: center; color: #aaa; padding: 50px 20px; font-style: italic; }
+  .loading { text-align: center; color: var(--gris); padding: 40px 20px; }
+
+  /* ── CULITVO BADGE ── */
+  .cv-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 600px) {
+    .filters-bar { flex-direction: column; }
+    .filter-group { min-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-logo">🌾</span>
+  <div>
+    <div class="header-title">SOS Agro — Insumos por Ha</div>
+    <div class="header-sub">Campaña 26-27 · Cantidades físicas</div>
+  </div>
+  <span id="sync-status" style="margin-left:auto"></span>
+  <button id="sync-btn" onclick="loadData()">🔄 Actualizar</button>
+</div>
+
+<div class="filters-bar">
+  <div class="filter-group">
+    <label>Cultivo</label>
+    <select id="f-cultivo" onchange="onCultivoChange()">
+      <option value="">-- todos --</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Antecesor</label>
+    <select id="f-ant" onchange="onAntChange()">
+      <option value="">-- todos --</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Situación</label>
+    <select id="f-sit" onchange="render()">
+      <option value="">-- todas --</option>
+    </select>
+  </div>
+  <div class="filter-group" style="min-width:unset">
+    <label>Tipo</label>
+    <div class="tipo-chips" id="tipo-chips"></div>
+  </div>
+</div>
+
+<div class="main">
+  <div id="info-bar" class="info-bar"></div>
+  <div class="loading" id="loading-msg">⏳ Cargando datos desde Google Sheets…</div>
+  <div class="table-wrap" id="table-wrap" style="display:none">
+    <table id="main-table">
+      <thead>
+        <tr>
+          <th>Producto / Labor</th>
+          <th>Tipo</th>
+          <th class="num">Dosis/ha</th>
+          <th>Unidad</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div class="empty" id="empty-msg" style="display:none">Sin datos para los filtros seleccionados.</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  DATOS Y CONSTANTES
+// ══════════════════════════════════════════════════════════════
+const GS_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQP-MdPOLnvCp1frsSDdOvsPlaAE7nAGhKzIHQSvX-EO8XsczZ4QuyYbWyV7kwYDChzl9zJ1Bga_A3p/pub?gid=1971005334&single=true&output=csv';
+
+const CORS_PROXIES = [
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+];
+
+let RECORDS = [];
+let OPTIONS = {}; // cultivo → { activs, antecesores, situaciones }
+
+// Tipos disponibles y su color
+const TIPO_COLORS = {
+  'Coadyuvante':  { bg:'#e8f4fd', color:'#1565c0' },
+  'Cosecha':      { bg:'#fff3e0', color:'#e65100' },
+  'Fertilizante': { bg:'#e8f5e9', color:'#2e7d32' },
+  'Fungicida':    { bg:'#f3e5f5', color:'#6a1b9a' },
+  'Herbicida':    { bg:'#fce4ec', color:'#880e4f' },
+  'Inoculante':   { bg:'#e0f7fa', color:'#006064' },
+  'Insecticida':  { bg:'#fff8e1', color:'#f57f17' },
+  'Labor':        { bg:'#efebe9', color:'#4e342e' },
+  'Semilla':      { bg:'#f1f8e9', color:'#558b2f' },
+  'Siembra':      { bg:'#e8eaf6', color:'#283593' },
+};
+
+const CULTIVO_COLORS = {
+  'Trigo':       { bg:'#fff9c4', color:'#827717' },
+  'Cebada':      { bg:'#ffe082', color:'#5d4037' },
+  'Soja':        { bg:'#c8e6c9', color:'#1b5e20' },
+  'Maiz':        { bg:'#ffccbc', color:'#bf360c' },
+  'Girasol':     { bg:'#fff9c4', color:'#f57f17' },
+  'Maiz tardio': { bg:'#f8bbd0', color:'#880e4f' },
+  'Maiz 2da':    { bg:'#ffcdd2', color:'#b71c1c' },
+  'Soja 2da':    { bg:'#bbdefb', color:'#0d47a1' },
+};
+
+const CULTIVO_ORDER = ['Trigo','Cebada','Soja','Maiz','Girasol','Maiz tardio','Maiz 2da','Soja 2da'];
+
+// Tipos activos (todos excepto Cosecha por defecto)
+let activeTipos = new Set(Object.keys(TIPO_COLORS).filter(t => t !== 'Cosecha'));
+
+// ══════════════════════════════════════════════════════════════
+//  FETCH
+// ══════════════════════════════════════════════════════════════
+async function fetchWithFallback(url) {
+  for (const proxy of CORS_PROXIES) {
+    try {
+      const res = await fetch(proxy(url), { cache: 'no-store' });
+      if (res.ok) return await res.text();
+    } catch(e) {}
+  }
+  throw new Error('No se pudo conectar al servidor.');
+}
+
+async function loadData() {
+  const btn = document.getElementById('sync-btn');
+  const st  = document.getElementById('sync-status');
+  btn.disabled = true; btn.textContent = '⏳';
+  st.textContent = 'Cargando…'; st.style.color = '#fff59d';
+
+  try {
+    const text = await fetchWithFallback(GS_URL);
+    const recs = csvToRecords(text);
+    if (!recs || recs.error) throw new Error(recs?.error || 'CSV vacío');
+
+    RECORDS = recs;
+    OPTIONS = rebuildOptions(RECORDS);
+
+    populateCultivoSel();
+    buildTipoChips();
+    render();
+
+    document.getElementById('loading-msg').style.display = 'none';
+    document.getElementById('empty-msg').style.display = '';
+    document.getElementById('empty-msg').textContent = 'Seleccioná cultivo, antecesor y situación para ver los insumos.';
+    st.textContent = `✅ ${RECORDS.length} registros · ${new Date().toLocaleTimeString('es-AR')}`;
+    st.style.color = '#a5d6a7';
+  } catch(e) {
+    document.getElementById('loading-msg').textContent = '❌ ' + e.message;
+    st.textContent = '❌ Error'; st.style.color = '#ef9a9a';
+  }
+  btn.disabled = false; btn.textContent = '🔄 Actualizar';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PARSING
+// ══════════════════════════════════════════════════════════════
+function csvToRecords(csvText) {
+  const lines = csvText.trim().split('\n');
+  if (lines.length < 2) return null;
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const required = ['Fecha','Activ','Produc/labor','Dosis','Tipo','Unidad','E/I'];
+  const missing = required.filter(r => !headers.includes(r));
+  if (missing.length) return { error: 'Faltan columnas: ' + missing.join(', ') };
+
+  const NORM = {'fina':'Fina','trigo':'Trigo','cebada':'Cebada','soja':'Soja','maiz':'Maiz',
+    'girasol':'Girasol','maiz tardio':'Maiz tardio','maiz 2da':'Maiz 2da','soja 2da':'Soja 2da'};
+  const VALID = new Set(Object.values(NORM));
+
+  const records = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i]; if (!line.trim()) continue;
+    const vals = []; let cur = '', inQ = false;
+    for (const ch of line) {
+      if (ch === '"') inQ = !inQ;
+      else if (ch === ',' && !inQ) { vals.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    vals.push(cur);
+    const row = {};
+    headers.forEach((h, idx) => row[h] = (vals[idx] || '').trim().replace(/^"|"$/g, ''));
+    if (!row['Fecha'] || !row['Activ'] || !row['Produc/labor'] || !row['Tipo']) continue;
+    row['Activ'] = NORM[row['Activ'].toLowerCase().trim()] || row['Activ'];
+    if (!VALID.has(row['Activ'])) continue;
+
+    const raw = String(row['Fecha']).trim();
+    let d;
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(raw)) {
+      const [dd,mm,yyyy] = raw.split('/');
+      d = new Date(`${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`);
+    } else { d = new Date(raw); }
+    if (isNaN(d)) continue;
+
+    row['Fecha'] = d.toISOString().substring(0, 10);
+    row['Dosis'] = parseFloat(String(row['Dosis']).replace(',', '.')) || 0;
+    row['Orden de Carga'] = parseInt(String(row['Orden de Carga']).replace(',', '.')) || 9999;
+    row['Antecesor'] = row['Antecesor'] || 'todos';
+    row['Situacion'] = row['Situacion'] || 'todas';
+    records.push(row);
+  }
+  return records;
+}
+
+function rebuildOptions(records) {
+  const cultivoActivs = {
+    'Trigo':['Fina','Trigo'],'Cebada':['Fina','Cebada'],'Soja':['Soja'],
+    'Maiz':['Maiz'],'Girasol':['Girasol'],'Maiz tardio':['Maiz tardio'],
+    'Maiz 2da':['Maiz 2da'],'Soja 2da':['Soja 2da']
+  };
+  const normA = a => {
+    const AMAP = {'fina':'Fina','trigo':'Trigo','cebada':'Cebada','soja':'Soja','maiz':'Maiz',
+      'girasol':'Girasol','maiz tardio':'Maiz tardio','maiz 2da':'Maiz 2da','soja 2da':'Soja 2da'};
+    return AMAP[String(a).toLowerCase().trim()] || a;
+  };
+  const splitTok = s => String(s).split(/\s+o\s+|,\s*|\s+y\s+/).map(t=>t.trim()).filter(Boolean);
+  const dedupCi = arr => {
+    const seen = {};
+    for (const v of arr.sort()) { const k = v.toLowerCase(); if (!seen[k]) seen[k] = v; }
+    return Object.values(seen).sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+  };
+  const opts = {};
+  for (const [cultivo, activs] of Object.entries(cultivoActivs)) {
+    const sub = records.filter(r => activs.includes(normA(r.Activ)));
+    let ants = [];
+    sub.forEach(r => { if (r.Antecesor.toLowerCase() !== 'todos') ants.push(...splitTok(r.Antecesor)); });
+    if (['Trigo','Cebada'].includes(cultivo)) ants.push('Soja');
+    let sits = [];
+    sub.forEach(r => { if (r.Situacion.toLowerCase() !== 'todas') sits.push(...splitTok(r.Situacion)); });
+    opts[cultivo] = { activs, antecesores: dedupCi(ants), situaciones: dedupCi(sits) };
+  }
+  return opts;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MATCHING
+// ══════════════════════════════════════════════════════════════
+function normActiv(a) {
+  const M = {'fina':'Fina','trigo':'Trigo','cebada':'Cebada','soja':'Soja','maiz':'Maiz',
+    'girasol':'Girasol','maiz tardio':'Maiz tardio','maiz 2da':'Maiz 2da','soja 2da':'Soja 2da'};
+  return M[String(a).toLowerCase().trim()] || a;
+}
+function antMatches(recordAnt, selectedAnt) {
+  if (!selectedAnt) return true;
+  if (recordAnt.toLowerCase() === 'todos') return true;
+  const ra = recordAnt.toLowerCase(), sa = selectedAnt.toLowerCase();
+  if (ra === sa) return true;
+  return ra.split(/\s+o\s+|,\s*|\s+y\s+/).map(s=>s.trim()).includes(sa);
+}
+function sitMatches(recordSit, selectedSit) {
+  if (!selectedSit) return true;
+  if (recordSit.toLowerCase() === 'todas') return true;
+  const rs = recordSit.toLowerCase(), ss = selectedSit.toLowerCase();
+  if (rs === ss) return true;
+  return rs.split(/\s+o\s+|,\s*|\s+y\s+/).map(s=>s.trim()).includes(ss);
+}
+function getSituacionesDisplay(cultivo) {
+  const sits = OPTIONS[cultivo]?.situaciones || [];
+  return sits.some(s => s.toLowerCase() === 'base') ? sits : ['Base', ...sits];
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FILTROS UI
+// ══════════════════════════════════════════════════════════════
+function populateCultivoSel() {
+  const sel = document.getElementById('f-cultivo');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">-- todos --</option>';
+  for (const c of CULTIVO_ORDER) {
+    if (OPTIONS[c]?.activs?.length) {
+      sel.innerHTML += `<option value="${c}"${c===cur?' selected':''}>${c.toUpperCase()}</option>`;
+    }
+  }
+}
+
+function onCultivoChange() {
+  const cultivo = document.getElementById('f-cultivo').value;
+  const selAnt = document.getElementById('f-ant');
+  const selSit = document.getElementById('f-sit');
+
+  selAnt.innerHTML = '<option value="">-- todos --</option>';
+  selSit.innerHTML = '<option value="">-- todas --</option>';
+
+  if (cultivo && OPTIONS[cultivo]) {
+    for (const a of OPTIONS[cultivo].antecesores)
+      selAnt.innerHTML += `<option value="${a}">${a.toUpperCase()}</option>`;
+  } else {
+    // Unión de antecesores de todos los cultivos
+    const all = [...new Set(Object.values(OPTIONS).flatMap(o => o.antecesores))].sort();
+    for (const a of all)
+      selAnt.innerHTML += `<option value="${a}">${a.toUpperCase()}</option>`;
+  }
+  render();
+}
+
+function onAntChange() {
+  const cultivo = document.getElementById('f-cultivo').value;
+  const ant = document.getElementById('f-ant').value;
+  const selSit = document.getElementById('f-sit');
+  selSit.innerHTML = '<option value="">-- todas --</option>';
+
+  let sits = [];
+  if (cultivo && OPTIONS[cultivo]) {
+    sits = getSituacionesDisplay(cultivo);
+  } else {
+    sits = [...new Set(Object.keys(OPTIONS).flatMap(c => getSituacionesDisplay(c)))].sort();
+  }
+  for (const s of sits)
+    selSit.innerHTML += `<option value="${s}">${s.toUpperCase()}</option>`;
+  render();
+}
+
+function buildTipoChips() {
+  const wrap = document.getElementById('tipo-chips');
+  wrap.innerHTML = '';
+  for (const tipo of Object.keys(TIPO_COLORS)) {
+    const chip = document.createElement('span');
+    chip.className = 'tipo-chip' + (activeTipos.has(tipo) ? ' active' : '');
+    chip.textContent = tipo;
+    chip.onclick = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl+click: toggle este tipo
+        if (activeTipos.has(tipo)) activeTipos.delete(tipo);
+        else activeTipos.add(tipo);
+      } else {
+        // Click normal: seleccionar solo este
+        activeTipos.clear();
+        activeTipos.add(tipo);
+      }
+      document.querySelectorAll('.tipo-chip').forEach(c => {
+        c.classList.toggle('active', activeTipos.has(c.textContent));
+      });
+      render();
+    };
+    wrap.appendChild(chip);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════════════════════════════
+function fmtDosis(d) {
+  if (d === Math.floor(d)) return d.toLocaleString('es-AR');
+  return d.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 4 });
+}
+
+function cultivoBadge(cultivo) {
+  const c = CULTIVO_COLORS[cultivo] || { bg:'#eee', color:'#555' };
+  return `<span class="cv-badge" style="background:${c.bg};color:${c.color}">${cultivo.toUpperCase()}</span>`;
+}
+
+function tipoBadge(tipo) {
+  const c = TIPO_COLORS[tipo] || { bg:'#eee', color:'#555' };
+  return `<span class="tipo-badge" style="background:${c.bg};color:${c.color}">${tipo}</span>`;
+}
+
+function render() {
+  if (!RECORDS.length) return;
+
+  const cultivo = document.getElementById('f-cultivo').value;
+  const ant     = document.getElementById('f-ant').value;
+  const sit     = document.getElementById('f-sit').value;
+
+  const tbody    = document.getElementById('tbody');
+  const infoBar  = document.getElementById('info-bar');
+  const tableWrap = document.getElementById('table-wrap');
+  const emptyMsg  = document.getElementById('empty-msg');
+
+  // Requiere los 3 filtros seleccionados
+  if (!cultivo || !ant || !sit) {
+    tableWrap.style.display = 'none';
+    emptyMsg.style.display  = '';
+    emptyMsg.textContent    = 'Seleccioná cultivo, antecesor y situación para ver los insumos.';
+    infoBar.innerHTML = '';
+    return;
+  }
+
+  const activs = OPTIONS[cultivo]?.activs || [];
+
+  // Filtrar registros
+  const recs = RECORDS.filter(r =>
+    activs.includes(normActiv(r.Activ)) &&
+    r['E/I'].toLowerCase() === 'egreso' &&
+    r.Tipo !== 'Grano' &&
+    antMatches(r.Antecesor, ant) &&
+    sitMatches(r.Situacion, sit) &&
+    activeTipos.has(r.Tipo)
+  );
+
+  // Agregar por Produc/labor + Tipo + Unidad → sumar Dosis, tomar menor orden/fecha
+  const agg = {};
+  for (const r of recs) {
+    const key = `${r['Produc/labor']}||${r.Tipo}||${r.Unidad}`;
+    if (!agg[key]) {
+      agg[key] = {
+        prod:   r['Produc/labor'],
+        tipo:   r.Tipo,
+        unidad: r.Unidad,
+        dosis:  0,
+        orden:  r['Orden de Carga'] || 9999,
+        fecha:  r.Fecha,
+      };
+    }
+    agg[key].dosis += r.Dosis;
+    // Guardar el orden/fecha más temprano para ordenar bien
+    if ((r['Orden de Carga'] || 9999) < agg[key].orden) agg[key].orden = r['Orden de Carga'] || 9999;
+    if (r.Fecha < agg[key].fecha) agg[key].fecha = r.Fecha;
+  }
+
+  const items = Object.values(agg).sort((a,b) =>
+    a.fecha.localeCompare(b.fecha) || a.orden - b.orden
+  );
+
+  if (!items.length) {
+    tableWrap.style.display = 'none';
+    emptyMsg.style.display  = '';
+    emptyMsg.textContent    = 'Sin datos para los filtros seleccionados.';
+    infoBar.innerHTML = '';
+    return;
+  }
+
+  let html = '';
+  for (const item of items) {
+    html += `<tr>
+      <td><strong>${item.prod}</strong></td>
+      <td>${tipoBadge(item.tipo)}</td>
+      <td class="num">${fmtDosis(item.dosis)}</td>
+      <td style="color:#666">${item.unidad}</td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+  tableWrap.style.display = '';
+  emptyMsg.style.display  = 'none';
+
+  infoBar.innerHTML = `
+    <span class="info-tag">${cultivo.toUpperCase()}</span>
+    <span class="info-tag">Ant: ${ant}</span>
+    <span class="info-tag">Sit: ${sit}</span>
+    <span style="color:#999">${items.length} producto(s) · ${[...activeTipos].join(', ')}</span>
+  `;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════════
+loadData();
+</script>
+</body>
+</html>
