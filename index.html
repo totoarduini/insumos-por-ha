@@ -146,7 +146,20 @@
     text-transform: uppercase;
   }
 
-  /* ── EMPTY ── */
+  /* ── DETALLE EXPANDIBLE ── */
+  .detail-row td {
+    background: #fafafa;
+    border-bottom: 1px solid #f0f0f0;
+    padding: 4px 12px 4px 32px;
+    font-size: 11px;
+    color: #666;
+  }
+  .detail-row:last-child td { border-bottom: 1px solid #f0f0f0; }
+  .detail-row td.num { color: #888; font-weight: 500; text-align: right; }
+  tr.expandable { cursor: pointer; }
+  tr.expandable:hover td { background: #e8f4e8; }
+  .expand-icon { display: inline-block; width: 14px; color: #999; font-size: 10px; transition: transform .15s; }
+  .expand-icon.open { transform: rotate(90deg); }
   .empty { text-align: center; color: #aaa; padding: 50px 20px; font-style: italic; }
   .loading { text-align: center; color: var(--gris); padding: 40px 20px; }
 
@@ -210,6 +223,7 @@
     <table id="main-table">
       <thead>
         <tr>
+          <th style="width:18px"></th>
           <th>Producto / Labor</th>
           <th>Tipo</th>
           <th class="num">Dosis/ha</th>
@@ -544,24 +558,39 @@ function render() {
     activeTipos.has(r.Tipo)
   );
 
-  // Agregar por Produc/labor + Tipo + Unidad → sumar Dosis, tomar menor orden/fecha
+  // Agregar por Produc/labor + Unidad → sumar Dosis, tomar Tipo más frecuente, guardar detalle
   const agg = {};
   for (const r of recs) {
-    const key = `${r['Produc/labor']}||${r.Tipo}||${r.Unidad}`;
+    const key = `${r['Produc/labor']}||${r.Unidad}`;
     if (!agg[key]) {
       agg[key] = {
         prod:   r['Produc/labor'],
-        tipo:   r.Tipo,
         unidad: r.Unidad,
         dosis:  0,
+        tipos:  {},
         orden:  r['Orden de Carga'] || 9999,
         fecha:  r.Fecha,
+        detalle: [],  // registros individuales
       };
     }
     agg[key].dosis += r.Dosis;
-    // Guardar el orden/fecha más temprano para ordenar bien
+    agg[key].tipos[r.Tipo] = (agg[key].tipos[r.Tipo] || 0) + 1;
     if ((r['Orden de Carga'] || 9999) < agg[key].orden) agg[key].orden = r['Orden de Carga'] || 9999;
     if (r.Fecha < agg[key].fecha) agg[key].fecha = r.Fecha;
+    agg[key].detalle.push({
+      fecha:     r.Fecha,
+      categoria: r.Categoria || '—',
+      antecesor: r.Antecesor,
+      situacion: r.Situacion,
+      dosis:     r.Dosis,
+      unidad:    r.Unidad,
+    });
+  }
+
+  // Resolver Tipo más frecuente y ordenar detalle por fecha
+  for (const item of Object.values(agg)) {
+    item.tipo = Object.entries(item.tipos).sort((a,b) => b[1]-a[1])[0][0];
+    item.detalle.sort((a,b) => a.fecha.localeCompare(b.fecha));
   }
 
   const items = Object.values(agg).sort((a,b) =>
@@ -577,14 +606,36 @@ function render() {
   }
 
   let html = '';
-  for (const item of items) {
-    html += `<tr>
+  items.forEach((item, idx) => {
+    const detId = `det-${idx}`;
+    const hasMultiple = item.detalle.length > 1;
+    // Fila principal
+    html += `<tr class="expandable" onclick="toggleDetail('${detId}', this)">
+      <td style="color:#bbb;font-size:10px;padding-left:10px">
+        ${hasMultiple ? `<span class="expand-icon" id="icon-${detId}">▶</span>` : ''}
+      </td>
       <td><strong>${item.prod}</strong></td>
       <td>${tipoBadge(item.tipo)}</td>
       <td class="num">${fmtDosis(item.dosis)}</td>
       <td style="color:#666">${item.unidad}</td>
     </tr>`;
-  }
+    // Filas de detalle (ocultas por defecto)
+    if (hasMultiple) {
+      html += `<tr id="${detId}" style="display:none"><td colspan="5" style="padding:0">
+        <table style="width:100%;border-collapse:collapse">`;
+      for (const d of item.detalle) {
+        html += `<tr class="detail-row">
+          <td style="width:18px"></td>
+          <td style="color:#888">${d.fecha}</td>
+          <td style="color:#666">${d.categoria}</td>
+          <td style="color:#999;font-size:10px">${d.antecesor} · ${d.situacion}</td>
+          <td class="num">${fmtDosis(d.dosis)}</td>
+          <td style="color:#aaa">${d.unidad}</td>
+        </tr>`;
+      }
+      html += `</table></td></tr>`;
+    }
+  });
   tbody.innerHTML = html;
   tableWrap.style.display = '';
   emptyMsg.style.display  = 'none';
@@ -595,6 +646,18 @@ function render() {
     <span class="info-tag">Sit: ${sit}</span>
     <span style="color:#999">${items.length} producto(s) · ${[...activeTipos].join(', ')}</span>
   `;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TOGGLE DETALLE
+// ══════════════════════════════════════════════════════════════
+function toggleDetail(detId, row) {
+  const det  = document.getElementById(detId);
+  const icon = document.getElementById('icon-' + detId);
+  if (!det) return;
+  const open = det.style.display === 'none';
+  det.style.display = open ? '' : 'none';
+  if (icon) icon.classList.toggle('open', open);
 }
 
 // ══════════════════════════════════════════════════════════════
